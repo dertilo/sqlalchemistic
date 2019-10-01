@@ -1,0 +1,3 @@
+util@git+https://git@github.com/dertilo/util.git#egg=util
+sqlalchemy
+psycopg2 # needs: sudo apt-get install libpq-dev
