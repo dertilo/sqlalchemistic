@@ -29,8 +29,8 @@ def get_sqlalchemy_base_engine(POSTGRES_URL='postgres:postgres@localhost:5432/po
 def sql_row_to_dict(row):
     return {k:json.loads(v) if v is not None else None for k,v in row.items() }
 
-def bulk_update(conn:Connection,table:Table,col_name:str,ids_values:List[Tuple]):
-    stmt = table.update().where(table.c.id == bindparam('obj_id')).values(**{col_name: bindparam('val')})
+def bulk_update_column(conn:Connection, table:Table, col_name:str, ids_values:List[Tuple],key_col = 'id'):
+    stmt = table.update().where(getattr(table.c,key_col) == bindparam('obj_id')).values(**{col_name: bindparam('val')})
     conn.execute(stmt, [{'obj_id': eid, 'val': val} for eid, val in ids_values])
 
 def add_column(engine, table_name, column:Column):
@@ -92,12 +92,12 @@ def process_table_batchwise(sqlalchemy_engine, q:Query, table:Table,
     return process_time
 
 
-def update_table(conn, processed_batch:List[Dict[str,str]], table:Table):
-    columns_to_update = list(processed_batch[0].keys())
-    [d.update({'obj_id': d.pop('id')}) for d in processed_batch]
+def update_table(conn, processed_batch:List[Dict[str,str]], table:Table,primary_key_col='id'):
+    columns_to_update = [k for k in processed_batch[0].keys() if k!=primary_key_col]
+    [d.update({'obj_id': d.pop(primary_key_col)}) for d in processed_batch]
     stmt = table.update(). \
-        where(table.c.id == bindparam('obj_id')). \
-        values(**{col_name: bindparam(col_name) for col_name in columns_to_update if col_name != 'id'})
+        where(getattr(table.c,primary_key_col) == bindparam('obj_id')). \
+        values(**{col_name: bindparam(col_name) for col_name in columns_to_update})
     conn.execute(stmt, processed_batch)
 
 
@@ -127,6 +127,10 @@ def insert_if_not_existing(conn, table:Table, data:Iterable, batch_size=10000):
             conn.execute(table.insert(), [d for d in rows if d['id'] in ids_to_insert])
 
     util_methods.consume_batchwise(insert_batch, data, batch_size)
+
+def get_rows(conn:Connection,query:Query):
+    for row in conn.execute(query):
+        yield sql_row_to_dict(row)
 
 def fetchmany_sqlalchemy(
         sqlalchemy_engine,
