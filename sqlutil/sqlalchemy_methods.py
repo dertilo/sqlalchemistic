@@ -15,15 +15,20 @@ from sqlalchemy.ext.declarative import declarative_base
 from util import util_methods
 from util.util_methods import iterate_and_time
 
+sqlalchemy_base,sqlalchemy_engine = None,None
 
-def get_sqlalchemy_base_engine(POSTGRES_URL='postgres:postgres@localhost:5432/postgres',
-                               host = None):
-    if host is not None:
-        POSTGRES_URL = 'postgres:postgres@%s:5432/postgres' % host
+def get_sqlalchemy_base_engine(dburl):
+    global sqlalchemy_engine,sqlalchemy_base
+    if sqlalchemy_engine is None or sqlalchemy_base is None:
+        sqlalchemy_base,sqlalchemy_engine = create_sqlalchemy_base_engine(dburl)
+    return sqlalchemy_base,sqlalchemy_engine
+
+def create_sqlalchemy_base_engine(dburl='sqlite:///sqlalchemy.db'):
     sqlalchemy_base = declarative_base()
 
-    sqlalchemy_engine = create_engine('postgresql://%s' % POSTGRES_URL,echo=False)
+    sqlalchemy_engine = create_engine(dburl, echo=False)
     sqlalchemy_base.metadata.bind = sqlalchemy_engine
+    sqlalchemy_base.metadata.create_all(sqlalchemy_engine)
     return sqlalchemy_base,sqlalchemy_engine
 
 def sql_row_to_dict(row):
