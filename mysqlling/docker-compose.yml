@@ -1,0 +1,41 @@
+version: '3.7'
+
+services:
+  mysqlserver:
+    image: "mysql:latest"
+    container_name: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DBPASSWORD}
+      - MYSQL_DATABASE=mysql
+      - MYSQL_USER=${DBUSER}
+      - MYSQL_PORT=3306
+      - MYSQL_PASSWORD=${DBPASSWORD}
+    ports:
+      - 3306:3306
+    volumes:
+      - ${DATAPATH}:/var/lib/mysql
+    command: ["--character-set-server=utf8", "--collation-server=utf8_bin","--default-authentication-plugin=mysql_native_password"]
+
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-p${DBPASSWORD}", "-u${DBUSER}"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    networks:
+      net:
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    depends_on:
+      - mysqlserver
+    ports:
+      - 9191:80
+    environment:
+      - MYSQL_USERNAME=${DBUSER}
+      - MYSQL_ROOT_PASSWORD=${DBPASSWORD}
+      - PMA_HOST=mysqlserver
+    networks:
+      net:
+
+networks:
+  net:
