@@ -12,4 +12,13 @@ output of [benchmark_inserting_speed.py](benchmark_inserting_speed.py)
 * mysql: 17 secs
 * sqlite: 4.9 secs
 
--> postgres is a fat elephant! 
+-> postgres is a fat elephant!
+
+### semantic scholar to postgres
+* 1 processes speed = ~4700 rows/sec
+* 10 processes speed = ~36500 rows/sec
+
+
+    with 0 processes inserted 1000010 rows in 210.64 secs with speed of 4747.49 rows/sec
+    with 10 processes inserted 1000010 rows in 27.38 secs with speed of 36524.30 rows/sec
+ 

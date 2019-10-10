@@ -1,3 +1,4 @@
+import multiprocessing
 from pprint import pprint
 from time import time
 
@@ -17,7 +18,7 @@ def fill_missing_with_Nones(l, column_names):
 
 def build_consumer_supplier(limit,batch_size): ## called in main
     def consumer_supplier(): ## called once on worker
-
+        # print(multiprocessing.current_process())
         sqlalchemy_base, sqlalchemy_engine = create_sqlalchemy_base_engine(
             dburl='postgresql://postgres:postgres@localhost:5432/postgres')
 
@@ -41,8 +42,10 @@ if __name__ == "__main__":
     path = '/docker-share/data/semantic_scholar'
 
     files = [path + '/' + file_name for file_name in os.listdir(path) if file_name.startswith('s2') and file_name.endswith('.gz')]
-    num_processes=8
-    these_files = files[:num_processes]
+    max_num_processes=10
+    these_files = files[:max_num_processes]
+    limit = 100_000
+    batch_size = 1_000
 
     column_names = ['title','paperAbstract','year']
     columns = [Column('id', String, primary_key=True)] + [Column(colname, String(),nullable=True) for colname in column_names]
@@ -52,25 +55,27 @@ if __name__ == "__main__":
     table_name = 'semanticscholar'
     tables = get_tables_by_reflection(sqlalchemy_base.metadata, sqlalchemy_engine)
     pprint(tables)
-    if table_name in tables:
-        table = tables[table_name]
-        table.drop(sqlalchemy_engine)
-    table = Table(table_name, sqlalchemy_base.metadata, *columns, extend_existing=True)
-    table.create()
-    print('populating: %s'%table_name)
-    limit = 800_000
-    batch_size = 1_000
 
-    start = time()
-    consumer = build_consumer_supplier(limit=limit, batch_size=batch_size)()
-    [consumer(file) for file in files]
-    numrows = count_rows(sqlalchemy_engine,table)
-    dur = time() - start
-    print('with %d processes inserted %d rows in %0.2f secs with speed of %0.2f rows/sec' % (0,numrows,dur,float(numrows)/dur))
+    def run_benchmark(num_processes=0):
+        if table_name in tables:
+            table = tables[table_name]
+            table.drop(sqlalchemy_engine)
+        table = Table(table_name, sqlalchemy_base.metadata, *columns, extend_existing=True)
+        table.create()
+        print('populating: %s with %d processes' % (table_name,num_processes))
+        start = time()
+        if num_processes==0:
+            consumer = build_consumer_supplier(limit=limit, batch_size=batch_size)()
+            [consumer(file) for file in these_files ]
+        else:
+            consume_parallel(these_files,
+                             build_consumer_supplier(limit=limit, batch_size=batch_size),
+                             num_processes=num_processes)
 
+        numrows = count_rows(sqlalchemy_engine, table)
+        dur = time() - start
+        print('with %d processes inserted %d rows in %0.2f secs with speed of %0.2f rows/sec' % (
+            num_processes, numrows, dur, float(numrows) / dur))
 
-    start = time()
-    consume_parallel(these_files, build_consumer_supplier(limit=int(limit/num_processes), batch_size=batch_size), num_processes=num_processes)
-    numrows = count_rows(sqlalchemy_engine,table)
-    dur = time() - start
-    print('with %d processes inserted %d rows in %0.2f secs with speed of %0.2f rows/sec' % (num_processes,numrows,dur,float(numrows)/dur))
+    run_benchmark(0)
+    run_benchmark(10)
