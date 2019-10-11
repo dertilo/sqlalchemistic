@@ -33,7 +33,7 @@ def build_consumer_supplier(table_name,limit,batch_size,dburl='postgresql://post
         def consumer(file:str):## called multiple times on worker
             with sqlalchemy_engine.connect() as conn:
                 assert isinstance(file,str)
-                num_to_skip = next(get_rows(conn, select([state_table]).where(state_table.c.file == file)))['line']
+                num_to_skip = num_lines_already_read(conn, file)
                 print('%s skipping %d lines in file %s'%(multiprocessing.current_process(),num_to_skip,file))
                 data_g = (fill_missing_with_Nones(d, column_names) for d in
                           data_io.read_jsonl(file, limit=limit, num_to_skip=num_to_skip))
@@ -41,8 +41,12 @@ def build_consumer_supplier(table_name,limit,batch_size,dburl='postgresql://post
                 for count in populate_table(conn, table, data_g, batch_size=batch_size):
                     conn.execute(state_table.update().values(line=count+num_to_skip).where(state_table.c.file==file))
 
-                if limit is None:
+                if limit is None or num_lines_already_read(conn, file)<limit:
                     conn.execute(state_table.update().values(done=True).where(state_table.c.file == file))
+
+        def num_lines_already_read(conn, file):
+            num_to_skip = next(get_rows(conn, select([state_table]).where(state_table.c.file == file)))['line']
+            return num_to_skip
 
         return consumer
 
@@ -140,13 +144,13 @@ if __name__ == "__main__":
     dburl = 'postgresql://postgres:postgres@localhost:5432/postgres'
     path = '/docker-share/data/semantic_scholar'
     files = [path + '/' + file_name for file_name in os.listdir(path) if file_name.startswith('s2') and file_name.endswith('.gz')]
-    these_files = files[:12]
+    these_files = files[:24]
 
     benchmark_fun = lambda n:run_table_population(
                                      files=these_files,
                                      dburl=dburl,
                                      num_processes=n,
-                                     num_to_insert=100_000,
+                                     num_to_insert=1000_000,
                                      benchmark_mode=True,
                                      batch_size=1000)
 

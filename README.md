@@ -15,10 +15,12 @@ output of [benchmark_inserting_speed.py](benchmark_inserting_speed.py)
 -> postgres is a fat elephant!
 
 ### semantic scholar to postgres
-* 1 processes speed = ~4700 rows/sec
-* 10 processes speed = ~36500 rows/sec
+#### benchmarking insertation speed 
+* inserting ~24 million rows
+![speed](images/benchmarking_insertation_speed.png)
 
-
-    with 0 processes inserted 1000010 rows in 210.64 secs with speed of 4747.49 rows/sec
-    with 10 processes inserted 1000010 rows in 27.38 secs with speed of 36524.30 rows/sec
- 
+    with 1 processes inserted 23925694 rows in 5808.88 secs with speed of 4118.81 rows/sec
+    with 2 processes inserted 23925694 rows in 3176.49 secs with speed of 7532.12 rows/sec
+    with 4 processes inserted 23925694 rows in 1833.92 secs with speed of 13046.24 rows/sec
+    with 8 processes inserted 23925694 rows in 1189.98 secs with speed of 20105.95 rows/sec
+    with 12 processes inserted 23925694 rows in 1054.88 secs with speed of 22680.99 rows/sec
