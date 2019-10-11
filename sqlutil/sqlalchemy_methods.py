@@ -32,7 +32,7 @@ def create_sqlalchemy_base_engine(dburl='sqlite:///sqlalchemy.db'):
     return sqlalchemy_base,sqlalchemy_engine
 
 def sql_row_to_dict(row):
-    return {k:json.loads(v) if v is not None else None for k,v in row.items() }
+    return {k:v if v is not None else None for k,v in row.items() }
 
 def bulk_update_column(conn:Connection, table:Table, col_name:str, ids_values:List[Tuple],key_col = 'id'):
     stmt = table.update().where(getattr(table.c,key_col) == bindparam('obj_id')).values(**{col_name: bindparam('val')})
@@ -123,13 +123,13 @@ def insert_or_overwrite(conn, table:Table, rows:List[Dict]):
                      [{**{'obj_id': eid},**{'val_'+c:ids2values[eid][c] for c in column_names} } for eid in
                       ids_to_overwrite])
 
-def insert_if_not_existing(conn, table:Table, data:Iterable, batch_size=10000):
+def insert_if_not_existing(conn, table:Table, data:Iterable,primary_key_col='id', batch_size=10000):
     def insert_batch(rows):
-        ids = set([d['id'] for d in rows])
-        existing_ids = set([d['id'] for d in conn.execute(select([table]).where(table.c.id.in_(ids)))])
+        ids = set([d[primary_key_col] for d in rows])
+        existing_ids = set([d[primary_key_col] for d in conn.execute(select([table]).where(getattr(table.c,primary_key_col).in_(ids)))])
         ids_to_insert = set([eid for eid in ids if eid not in existing_ids])
         if len(ids_to_insert) > 0:
-            conn.execute(table.insert(), [d for d in rows if d['id'] in ids_to_insert])
+            conn.execute(table.insert(), [d for d in rows if d[primary_key_col] in ids_to_insert])
 
     util_methods.consume_batchwise(insert_batch, data, batch_size)
 
