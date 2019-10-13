@@ -16,7 +16,7 @@ output of [benchmark_inserting_speed.py](benchmark_inserting_speed.py)
 
 ### semantic scholar to postgres
 #### benchmarking insertation speed 
-* inserting ~24 million rows
+* inserting ~24 million rows  
 ![speed](images/benchmarking_insertation_speed.png)
 
 

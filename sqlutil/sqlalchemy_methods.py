@@ -17,6 +17,9 @@ from util.util_methods import iterate_and_time
 
 sqlalchemy_base,sqlalchemy_engine = None,None
 
+def build_postgres_url(host):
+    return 'postgresql://postgres:postgres@%s:5432/postgres'%host
+
 def get_sqlalchemy_base_engine(dburl):
     global sqlalchemy_engine,sqlalchemy_base
     if sqlalchemy_engine is None or sqlalchemy_base is None:
