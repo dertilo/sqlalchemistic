@@ -84,20 +84,13 @@ def create_or_expand_state_table(sqlalchemy_base, sqlalchemy_engine, table_name,
     insert_if_not_existing(sqlalchemy_engine,state_table,rows,primary_key_col='file')
     return state_table
 
-def run_table_population(files, dburl='postgresql://postgres:postgres@localhost:5432/postgres', num_processes=1,
+def run_table_population(table:Table,files,
+                         sqlalchemy_base, sqlalchemy_engine,
+                         num_processes=1,
                          num_to_insert=10_000, benchmark_mode=False, batch_size=1_00):
-    sqlalchemy_base, sqlalchemy_engine = create_sqlalchemy_base_engine(dburl)
-
-    def table_supplier():
-        table_name = 'semanticscholar'
-        column_names = ['title', 'paperAbstract', 'year']
-        columns = [Column('id', String, primary_key=True)] + [Column(colname, String(), nullable=True) for colname
-                                                              in column_names]
-        table = Table(table_name, sqlalchemy_base.metadata, *columns, extend_existing=True)
-        return table, table_name
 
     tables = get_tables_by_reflection(sqlalchemy_base.metadata, sqlalchemy_engine)
-    table, table_name = table_supplier()
+    table_name = table.name
 
     state_table = create_or_expand_state_table(sqlalchemy_base, sqlalchemy_engine, table_name, files,
                                                from_scratch=benchmark_mode)
@@ -139,20 +132,31 @@ def run_table_population(files, dburl='postgresql://postgres:postgres@localhost:
 
 
 if __name__ == "__main__":
+    def build_table(sqlalchemy_base):
+        table_name = 'semanticscholar'
+        column_names = ['title', 'paperAbstract', 'year']
+        columns = [Column('id', String, primary_key=True)] + [Column(colname, String(), nullable=True) for colname
+                                                              in column_names]
+        table = Table(table_name, sqlalchemy_base.metadata, *columns, extend_existing=True)
+        return table
+
     import os
 
     dburl = 'postgresql://postgres:postgres@localhost:5432/postgres'
     path = '/docker-share/data/semantic_scholar'
     files = [path + '/' + file_name for file_name in os.listdir(path) if file_name.startswith('s2') and file_name.endswith('.gz')]
     these_files = files[:24]
+    sqlalchemy_base, sqlalchemy_engine = create_sqlalchemy_base_engine(dburl)
 
     benchmark_fun = lambda n:run_table_population(
-                                     files=these_files,
-                                     dburl=dburl,
-                                     num_processes=n,
-                                     num_to_insert=1000_000,
-                                     benchmark_mode=True,
-                                     batch_size=1000)
+        table=build_table(sqlalchemy_base),
+        files=these_files,
+        sqlalchemy_base=sqlalchemy_base,
+        sqlalchemy_engine=sqlalchemy_engine,
+        num_processes=n,
+        num_to_insert=1000_000,
+        benchmark_mode=True,
+        batch_size=1000)
 
     df = pandas.DataFrame(data=[{'num-cores':n,'speed':benchmark_fun(n)} for n in [1,2,4,8,12]])
     ax = df.plot.bar(x='num-cores',y='speed')
