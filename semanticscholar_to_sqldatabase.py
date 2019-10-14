@@ -19,8 +19,13 @@ def populate_table(conn,table,data_g,batch_size=1000):
         counter+=len(batch)
         yield counter
 
+def replace_null_character(v):
+    if isinstance(v,str):
+        v = v.replace('\x00', '')
+    return v
+
 def fill_missing_with_Nones(l, column_names):
-    return {k: l.get(k, None) for k in column_names + ['id']}
+    return {k: replace_null_character(l.get(k, None)) for k in column_names + ['id']}
 
 def build_consumer_supplier(table_name,limit,batch_size,dburl): ## called in main
     def consumer_supplier(): ## called once on worker
