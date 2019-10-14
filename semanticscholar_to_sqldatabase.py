@@ -22,7 +22,7 @@ def populate_table(conn,table,data_g,batch_size=1000):
 def fill_missing_with_Nones(l, column_names):
     return {k: l.get(k, None) for k in column_names + ['id']}
 
-def build_consumer_supplier(table_name,limit,batch_size,dburl='postgresql://postgres:postgres@localhost:5432/postgres'): ## called in main
+def build_consumer_supplier(table_name,limit,batch_size,dburl): ## called in main
     def consumer_supplier(): ## called once on worker
         sqlalchemy_base, sqlalchemy_engine = create_sqlalchemy_base_engine(dburl)
         tables = get_tables_by_reflection(sqlalchemy_base.metadata, sqlalchemy_engine)
@@ -59,15 +59,9 @@ def create_or_expand_state_table(sqlalchemy_base, sqlalchemy_engine, table_name,
     tables = get_tables_by_reflection(sqlalchemy_base.metadata, sqlalchemy_engine)
 
     state_table_name = table_name + 'state'
-    columns = [Column('file', String, primary_key=True), Column('line', Integer()),
-               Column('done', Boolean())]
-    state_table = Table(state_table_name, sqlalchemy_base.metadata, *columns, extend_existing=True)
-
-    print(list(tables.keys()))
     if state_table_name in tables:
         if from_scratch:
             state_table = tables[state_table_name]
-            print(state_table)
             try:
                 state_table.drop(sqlalchemy_engine)
             except: #TODO: why is drop failing?
@@ -77,6 +71,7 @@ def create_or_expand_state_table(sqlalchemy_base, sqlalchemy_engine, table_name,
         else:
             state_table = tables[state_table_name]
     else:
+        state_table = build_state_table(sqlalchemy_base, state_table_name)
         state_table.create()
         print('created state-table')
 
@@ -84,40 +79,48 @@ def create_or_expand_state_table(sqlalchemy_base, sqlalchemy_engine, table_name,
     insert_if_not_existing(sqlalchemy_engine,state_table,rows,primary_key_col='file')
     return state_table
 
-def run_table_population(table:Table,files,
-                         sqlalchemy_base, sqlalchemy_engine,
+
+def build_state_table(sqlalchemy_base, state_table_name):
+    columns = [Column('file', String, primary_key=True), Column('line', Integer()),
+               Column('done', Boolean())]
+    state_table = Table(state_table_name, sqlalchemy_base.metadata, *columns, extend_existing=True)
+    return state_table
+
+
+def run_table_population(build_table,
+                         files,
+                         dburl,
                          num_processes=1,
                          num_to_insert=10_000, benchmark_mode=False, batch_size=1_00):
 
-    tables = get_tables_by_reflection(sqlalchemy_base.metadata, sqlalchemy_engine)
+    sqlalchemy_base, sqlalchemy_engine = create_sqlalchemy_base_engine(dburl)
+    table = build_table(sqlalchemy_base)
     table_name = table.name
-
     state_table = create_or_expand_state_table(sqlalchemy_base, sqlalchemy_engine, table_name, files,
                                                from_scratch=benchmark_mode)
     files = [f[0] for f in
              sqlalchemy_engine.execute(select([state_table.c.file]).where(state_table.c.done == False))]
 
-    if table_name in tables:
+    if sqlalchemy_engine.has_table(table_name):
+        table = get_tables_by_reflection(sqlalchemy_base.metadata, sqlalchemy_engine)[table_name]
         if benchmark_mode:
             try:
-                tables[table_name].drop(sqlalchemy_engine)
+                table.drop(sqlalchemy_engine)
             except:#TODO: why is drop failing?
                 pass
             table.create()
-        else:
-            table = tables[table_name]
     else:
         table.create()
 
     print('populating: %s with %d processes' % (table_name, num_processes))
     start = time()
     if num_processes == 1:
-        consumer = build_consumer_supplier(table_name, limit=num_to_insert, batch_size=batch_size)()
+        consumer = build_consumer_supplier(table_name, limit=num_to_insert, batch_size=batch_size,dburl=dburl)()
         [consumer(file) for file in files]
     else:
         pool_consume(
             data=files,
-            consumer_supplier=build_consumer_supplier(table_name, limit=num_to_insert, batch_size=batch_size),
+            consumer_supplier=build_consumer_supplier(table_name, limit=num_to_insert, batch_size=batch_size,dburl=dburl),
             num_processes=num_processes)
 
     if benchmark_mode:
@@ -146,13 +149,11 @@ if __name__ == "__main__":
     path = '/docker-share/data/semantic_scholar'
     files = [path + '/' + file_name for file_name in os.listdir(path) if file_name.startswith('s2') and file_name.endswith('.gz')]
     these_files = files[:24]
-    sqlalchemy_base, sqlalchemy_engine = create_sqlalchemy_base_engine(dburl)
 
     benchmark_fun = lambda n:run_table_population(
-        table=build_table(sqlalchemy_base),
+        build_table=build_table,
         files=these_files,
-        sqlalchemy_base=sqlalchemy_base,
-        sqlalchemy_engine=sqlalchemy_engine,
+        dburl = dburl,
         num_processes=n,
         num_to_insert=1000_000,
         benchmark_mode=True,
