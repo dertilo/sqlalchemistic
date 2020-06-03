@@ -258,5 +258,15 @@ def get_tables_by_reflection(sqlalchemy_metadata, sqlalchemy_engine):
     return sqlalchemy_metadata.tables
 
 
+def get_or_create_table(table: Table, sqlalchemy_engine):
+    if sqlalchemy_engine.has_table(table.name):
+        table = get_tables_by_reflection(sqlalchemy_base.metadata, sqlalchemy_engine)[
+            table.name
+        ]
+    else:
+        table.create()
+    return table
+
+
 def count_rows(sqlalchemy_engine, table):
-    return sqlalchemy_engine.execute(select([func.count(table.c.id)])).first()[0]
+    return sqlalchemy_engine.execute(select([func.count(table)])).first()[0]
