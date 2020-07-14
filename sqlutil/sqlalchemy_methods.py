@@ -3,10 +3,10 @@ from multiprocessing.pool import Pool
 from sqlalchemy import bindparam, Table, select, String, Column, func
 from typing import Tuple, List, Any, Dict, Iterable, Callable
 
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Query
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import declarative_base, DeclarativeMeta, api
 from util import util_methods
 from util.util_methods import iterate_and_time
 
@@ -17,7 +17,7 @@ def build_postgres_url(host):
     return "postgresql://postgres:postgres@%s:5432/postgres" % host
 
 
-def get_sqlalchemy_base_engine(dburl):
+def get_sqlalchemy_base_engine(dburl)->Tuple[Any,Engine]:
     global sqlalchemy_engine, sqlalchemy_base
     if sqlalchemy_engine is None or sqlalchemy_base is None:
         sqlalchemy_base, sqlalchemy_engine = create_sqlalchemy_base_engine(dburl)
