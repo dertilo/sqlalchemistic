@@ -34,7 +34,7 @@ def create_sqlalchemy_base_engine(dburl="sqlite:///sqlalchemy.db"):
 
 
 def sql_row_to_dict(row):
-    return {k: v if v is not None else None for k, v in row.items()}
+    return dict(row)
 
 
 def bulk_update_column(
@@ -268,5 +268,5 @@ def get_or_create_table(table: Table, sqlalchemy_engine):
     return table
 
 
-def count_rows(sqlalchemy_engine, table):
+def count_rows(sqlalchemy_engine, table)->int:
     return sqlalchemy_engine.execute(select([func.count(table)])).first()[0]
